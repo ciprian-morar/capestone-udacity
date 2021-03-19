@@ -28,7 +28,7 @@ class LoadToS3Operator(BaseOperator):
         # connect to redshift with the PostgresHook
         self.log.info('LoadToS3Operator')
         s3 = S3Hook(aws_conn_id=self.aws_conn_id)
-        check_bucket = s3.check_bucket(self.bucket_name)
+        check_bucket = s3.check_for_bucket(self.bucket_name)
         if check_bucket is not True:
             s3.create_bucket(self.bucket_name)
         files = [self.relative_local_path + f for f in os.listdir(self.relative_local_path)]
