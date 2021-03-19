@@ -3,6 +3,8 @@ import os
 from airflow.models import BaseOperator
 from airflow.utils.decorators import apply_defaults
 from airflow.hooks.S3_hook import S3Hook
+import pathlib
+
 # """
 # LoadToS3 it's used in the upload
 # the data from locally to S3.
@@ -31,6 +33,9 @@ class LoadToS3Operator(BaseOperator):
         check_bucket = s3.check_for_bucket(self.bucket_name)
         if check_bucket is not True:
             s3.create_bucket(self.bucket_name)
+        self.log.info(pathlib.Path(__file__).parent.absolute())
         files = [self.relative_local_path + f for f in os.listdir(self.relative_local_path)]
+        self.log.info(files)
         for f in files:
+            self.log.info(f)
             s3.load_file(filename=f, bucket_name=self.bucket_name, replace=True, key=self.key)
