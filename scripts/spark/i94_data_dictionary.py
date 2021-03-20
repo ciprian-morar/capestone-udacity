@@ -2,8 +2,8 @@ import os
 import pyspark.sql.functions as F
 from pyspark.sql import SparkSession
 
-bucket = "s3a://capestone-project-udacity-ciprian/"
-i94_codes_path = "data/source/labels/"
+bucket = "s3a://capestone-udacity-project/"
+i94_codes_path = "data/source/staging/"
 file_names = {"airport_file" : "i94prtl.txt",
 "country_file" :"i94cntyl.txt",
 "state_file":"i94addrl.txt",

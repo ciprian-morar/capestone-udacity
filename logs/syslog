@@ -1,0 +1,90 @@
+2021-03-20 15:54:36,263 INFO com.amazon.elasticmapreduce.s3distcp.S3DistCp (main): Running with args: -libjars /usr/share/aws/emr/s3-dist-cp/lib/byte-buddy-1.9.10.jar,/usr/share/aws/emr/s3-dist-cp/lib/byte-buddy-agent-1.9.10.jar,/usr/share/aws/emr/s3-dist-cp/lib/commons-httpclient-3.1.jar,/usr/share/aws/emr/s3-dist-cp/lib/commons-logging-1.0.4.jar,/usr/share/aws/emr/s3-dist-cp/lib/guava-18.0.jar,/usr/share/aws/emr/s3-dist-cp/lib/mockito-core-2.27.0.jar,/usr/share/aws/emr/s3-dist-cp/lib/objenesis-2.6.jar,/usr/share/aws/emr/s3-dist-cp/lib/s3-dist-cp-2.13.0.jar,/usr/share/aws/emr/s3-dist-cp/lib/s3-dist-cp.jar --src=s3://capestone-udacity-project/scripts/spark.rar --dest=/scripts 
+2021-03-20 15:54:37,215 INFO com.amazon.elasticmapreduce.s3distcp.S3DistCp (main): S3DistCp args: --src=s3://capestone-udacity-project/scripts/spark.rar --dest=/scripts 
+2021-03-20 15:54:37,226 INFO com.amazon.elasticmapreduce.s3distcp.S3DistCp (main): Using output path 'hdfs:/tmp/a26ddf8e-2fa0-4861-9524-74bf3d39dc78/output'
+2021-03-20 15:54:37,325 INFO com.amazon.elasticmapreduce.s3distcp.S3DistCp (main): GET http://169.254.169.254/latest/meta-data/placement/availability-zone result: us-west-2c
+2021-03-20 15:54:42,421 WARN com.amazonaws.profile.path.cred.CredentialsLegacyConfigLocationProvider (main): Found the legacy config profiles file at [/home/hadoop/.aws/config]. Please move it to the latest default location [~/.aws/credentials].
+2021-03-20 15:54:42,482 INFO com.amazon.elasticmapreduce.s3distcp.S3DistCp (main): DefaultAWSCredentialsProviderChain is used to create AmazonS3Client. KeyId: ASIATD7QL6B5GNZD4GN6
+2021-03-20 15:54:42,859 INFO com.amazon.elasticmapreduce.s3distcp.FileInfoListing (main): Opening new file: hdfs:/tmp/a26ddf8e-2fa0-4861-9524-74bf3d39dc78/files/1
+2021-03-20 15:54:42,935 INFO com.amazon.elasticmapreduce.s3distcp.S3DistCp (main): Created 1 files to copy 1 files 
+2021-03-20 15:54:43,052 INFO com.amazon.elasticmapreduce.s3distcp.S3DistCp (main): Reducer number: 7
+2021-03-20 15:54:43,220 INFO org.apache.hadoop.yarn.client.RMProxy (main): Connecting to ResourceManager at ip-172-31-10-128.us-west-2.compute.internal/172.31.10.128:8032
+2021-03-20 15:54:44,693 INFO org.apache.hadoop.mapreduce.lib.input.FileInputFormat (main): Total input files to process : 1
+2021-03-20 15:54:45,163 INFO org.apache.hadoop.mapreduce.JobSubmitter (main): number of splits:1
+2021-03-20 15:54:45,282 INFO org.apache.hadoop.mapreduce.JobSubmitter (main): Submitting tokens for job: job_1616255590960_0001
+2021-03-20 15:54:45,906 INFO org.apache.hadoop.yarn.client.api.impl.YarnClientImpl (main): Submitted application application_1616255590960_0001
+2021-03-20 15:54:45,979 INFO org.apache.hadoop.mapreduce.Job (main): The url to track the job: http://ip-172-31-10-128.us-west-2.compute.internal:20888/proxy/application_1616255590960_0001/
+2021-03-20 15:54:45,980 INFO org.apache.hadoop.mapreduce.Job (main): Running job: job_1616255590960_0001
+2021-03-20 15:54:54,064 INFO org.apache.hadoop.mapreduce.Job (main): Job job_1616255590960_0001 running in uber mode : false
+2021-03-20 15:54:54,065 INFO org.apache.hadoop.mapreduce.Job (main):  map 0% reduce 0%
+2021-03-20 15:55:00,115 INFO org.apache.hadoop.mapreduce.Job (main):  map 100% reduce 0%
+2021-03-20 15:55:09,155 INFO org.apache.hadoop.mapreduce.Job (main):  map 100% reduce 29%
+2021-03-20 15:55:10,163 INFO org.apache.hadoop.mapreduce.Job (main):  map 100% reduce 43%
+2021-03-20 15:55:10,165 INFO org.apache.hadoop.mapreduce.Job (main): Task Id : attempt_1616255590960_0001_r_000001_0, Status : FAILED
+2021-03-20 15:55:11,183 INFO org.apache.hadoop.mapreduce.Job (main):  map 100% reduce 86%
+2021-03-20 15:55:16,206 INFO org.apache.hadoop.mapreduce.Job (main): Task Id : attempt_1616255590960_0001_r_000001_1, Status : FAILED
+2021-03-20 15:55:21,226 INFO org.apache.hadoop.mapreduce.Job (main): Task Id : attempt_1616255590960_0001_r_000001_2, Status : FAILED
+2021-03-20 15:55:28,251 INFO org.apache.hadoop.mapreduce.Job (main):  map 100% reduce 100%
+2021-03-20 15:55:29,263 INFO org.apache.hadoop.mapreduce.Job (main): Job job_1616255590960_0001 failed with state FAILED due to: Task failed task_1616255590960_0001_r_000001
+Job failed as tasks failed. failedMaps:0 failedReduces:1
+
+2021-03-20 15:55:29,380 INFO org.apache.hadoop.mapreduce.Job (main): Counters: 50
+	File System Counters
+		FILE: Number of bytes read=120
+		FILE: Number of bytes written=1240902
+		FILE: Number of read operations=0
+		FILE: Number of large read operations=0
+		FILE: Number of write operations=0
+		HDFS: Number of bytes read=366
+		HDFS: Number of bytes written=0
+		HDFS: Number of read operations=22
+		HDFS: Number of large read operations=0
+		HDFS: Number of write operations=12
+	Job Counters 
+		Failed reduce tasks=4
+		Launched map tasks=1
+		Launched reduce tasks=10
+		Rack-local map tasks=1
+		Total time spent by all maps in occupied slots (ms)=189744
+		Total time spent by all reduces in occupied slots (ms)=5850336
+		Total time spent by all map tasks (ms)=3953
+		Total time spent by all reduce tasks (ms)=60941
+		Total vcore-milliseconds taken by all map tasks=3953
+		Total vcore-milliseconds taken by all reduce tasks=60941
+		Total megabyte-milliseconds taken by all map tasks=6071808
+		Total megabyte-milliseconds taken by all reduce tasks=187210752
+	Map-Reduce Framework
+		Map input records=1
+		Map output records=1
+		Map output bytes=86
+		Map output materialized bytes=185
+		Input split bytes=169
+		Combine input records=0
+		Combine output records=0
+		Reduce input groups=0
+		Reduce shuffle bytes=96
+		Reduce input records=0
+		Reduce output records=0
+		Spilled Records=1
+		Shuffled Maps =6
+		Failed Shuffles=0
+		Merged Map outputs=6
+		GC time elapsed (ms)=1273
+		CPU time spent (ms)=4820
+		Physical memory (bytes) snapshot=1845215232
+		Virtual memory (bytes) snapshot=30956146688
+		Total committed heap usage (bytes)=1919942656
+	Shuffle Errors
+		BAD_ID=0
+		CONNECTION=0
+		IO_ERROR=0
+		WRONG_LENGTH=0
+		WRONG_MAP=0
+		WRONG_REDUCE=0
+	File Input Format Counters 
+		Bytes Read=197
+	File Output Format Counters 
+		Bytes Written=0
+2021-03-20 15:55:29,382 INFO com.amazon.elasticmapreduce.s3distcp.S3DistCp (main): Try to recursively delete hdfs:/tmp/a26ddf8e-2fa0-4861-9524-74bf3d39dc78
+2021-03-20 15:55:29,392 ERROR com.amazon.elasticmapreduce.s3distcp.S3DistCp (main): The MapReduce job failed: Task failed task_1616255590960_0001_r_000001
+Job failed as tasks failed. failedMaps:0 failedReduces:1
+

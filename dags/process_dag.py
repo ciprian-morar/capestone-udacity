@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta
-
+import os
 from airflow import DAG
 from airflow.operators.dummy_operator import DummyOperator
-from airflow.hooks.S3_hook import S3Hook
+from operators.load_to_s3 import LoadToS3Operator
 from airflow.operators import PythonOperator
 from airflow.contrib.operators.emr_create_job_flow_operator import (
     EmrCreateJobFlowOperator,
@@ -13,62 +13,29 @@ from airflow.contrib.operators.emr_terminate_job_flow_operator import (
     EmrTerminateJobFlowOperator,
 )
 
-# Configurations
-BUCKET_NAME = "capestone-project-udacity-ciprian" # "spark-submit-airflow"  # replace this with your bucket name
-local_data = "./dags/data/movie_review.csv"
-s3_data = "data/movie_review.csv"
-local_script = "./dags/scripts/spark/random_text_classification.py"
-s3_script = "scripts/random_text_classification.py"
-s3_weather_script = "scripts/emr/weather_data.py"
-s3_clean = "clean_data/"
+BUCKET_NAME = "capestone-udacity-project"
+region_name = 'us-west-2'
+scripts_rar_path = "scripts/spark.rar"
+default_args = {
+    "owner": "airflow",
+    "start_date": datetime(2016, 1, 1),
+    "depends_on_past": True,
+    "wait_for_downstream": True,
+}
 
-# {
-#         "Name": "Move raw data from S3 to HDFS",
-#         "ActionOnFailure": "CANCEL_AND_WAIT",
-#         "HadoopJarStep": {
-#             "Jar": "command-runner.jar",
-#             "Args": [
-#                 "s3-dist-cp",
-#                 "--src=s3://{{ params.BUCKET_NAME }}/data",
-#                 "--dest=/movie",
-#             ],
-#         },
-#     },
-# {
-#         "Name": "Move clean data from HDFS to S3",
-#         "ActionOnFailure": "CANCEL_AND_WAIT",
-#         "HadoopJarStep": {
-#             "Jar": "command-runner.jar",
-#             "Args": [
-#                 "s3-dist-cp",
-#                 "--src=/output",
-#                 "--dest=s3://{{ params.BUCKET_NAME }}/{{ params.s3_clean }}",
-#             ],
-#         },
-#     },
 
-SPARK_STEPS = [ # Note the params values are supplied to the operator
 
-    {
-        "Name": "Submit Scripts",
-        "ActionOnFailure": "CANCEL_AND_WAIT",
-        "HadoopJarStep": {
-            "Jar": "command-runner.jar",
-            "Args": [
-                "spark-submit",
-                "--master",
-                "yarn"
-                "--deploy-mode",
-                "cluster",
-                "s3://{{ params.BUCKET_NAME }}/{{ params.s3_weather_script }}",
-            ],
-        },
-    }
+dag = DAG(
+    "process_dag",
+    default_args=default_args,
+    schedule_interval=None,
+    max_active_runs=1,
+)
 
-]
+
 
 JOB_FLOW_OVERRIDES = {
-    "Name": "Movie review classifier",
+    "Name": "Capestone Udacity Immigrants",
     "ReleaseLabel": "emr-5.28.0",
     "Applications": [{"Name": "Hadoop"}, {"Name": "Spark"}, {"Name": "Livy"}, {"Name": "Hive"}], # We want our EMR cluster to have HDFS and Spark
     "Configurations": [
@@ -101,55 +68,63 @@ JOB_FLOW_OVERRIDES = {
         ],
         "KeepJobFlowAliveWhenNoSteps": True,
         "TerminationProtected": False, # this lets us programmatically terminate the cluster
-        'EmrManagedMasterSecurityGroup': 'sg-a061f99b',
+        'EmrManagedMasterSecurityGroup': 'sg-005d2c716cf4f6962',
         'EmrManagedSlaveSecurityGroup': 'sg-a061f99b',
-        'Ec2KeyName': 'capestone'
+        'Ec2KeyName': 'capestone',
     },
 
     "JobFlowRole": "EMR_EC2_DefaultRole",
     "ServiceRole": "EMR_DefaultRole",
+    'LogUri': 's3://aws-emr-ciprian-logs'
 }
 
-# helper function
-# def _local_to_s3(filename, key, bucket_name=BUCKET_NAME):
-#     s3 = S3Hook()
-#     s3.load_file(filename=filename, bucket_name=bucket_name, replace=True, key=key)
+SPARK_STEPS = [ # Note the params values are supplied to the operator
 
+    {
+            "Name": "Move raw data from S3 to HDFS",
+            "ActionOnFailure": "CANCEL_AND_WAIT",
+            "HadoopJarStep": {
+                "Jar": "command-runner.jar",
+                "Args": [
+                    "s3-dist-cp",
+                    "--src=s3://{{ params.BUCKET_NAME }}/{{params.scripts_rar_path}}",
+                    "--dest=/scripts",
+                ],
+            },
+    },
 
-default_args = {
-    "owner": "airflow",
-    "depends_on_past": True,
-    "wait_for_downstream": True,
-    "start_date": datetime(2016, 1, 1),
-    "email": ["airflow@airflow.com"],
-    "email_on_failure": False,
-    "email_on_retry": False,
-    "retries": 1,
-    "retry_delay": timedelta(minutes=5),
-}
+]
 
-dag = DAG(
-    "spark_submit_airflow",
-    default_args=default_args,
-    schedule_interval=None,
-    max_active_runs=1,
-)
+# {
+#     "Name": "Move scripts from S3 to HDFS",
+#     "ActionOnFailure": "CANCEL_AND_WAIT",
+#     "HadoopJarStep": {
+#         "Jar": "command-runner.jar",
+#         "Args": [
+#             "s3-dist-cp",
+#             "--src=s3://{{ params.BUCKET_NAME }}/data",
+#             "--dest=/movie",
+#         ],
+#     },
+# },
+#
+# {
+#     "Name": "Submit Scripts",
+#     "ActionOnFailure": "CANCEL_AND_WAIT",
+#     "HadoopJarStep": {
+#         "Jar": "command-runner.jar",
+#         "Args": [
+#             "spark-submit",
+#             "--master",
+#             "yarn"
+#             "--deploy-mode",
+#             "cluster",
+#             "s3://{{ params.BUCKET_NAME }}/{{ params.s3_weather_script }}",
+#         ],
+#     },
+# }
 
 start_data_pipeline = DummyOperator(task_id="start_data_pipeline", dag=dag)
-
-# data_to_s3 = PythonOperator(
-#     dag=dag,
-#     task_id="data_to_s3",
-#     python_callable=_local_to_s3,
-#     op_kwargs={"filename": local_data, "key": s3_data,},
-# )
-#
-# script_to_s3 = PythonOperator(
-#     dag=dag,
-#     task_id="script_to_s3",
-#     python_callable=_local_to_s3,
-#     op_kwargs={"filename": local_script, "key": s3_script,},
-# )
 
 # Create an EMR cluster
 create_emr_cluster = EmrCreateJobFlowOperator(
@@ -168,26 +143,27 @@ step_one = EmrAddStepsOperator(
     steps=SPARK_STEPS,
     params={ # these params are used to fill the paramterized values in SPARK_STEPS json
         "BUCKET_NAME": BUCKET_NAME,
-        "s3_data": s3_data,
-        "s3_script": s3_script,
-        "s3_weather_script": s3_weather_script,
-        "s3_clean": s3_clean,
+        "scripts_rar_path": scripts_rar_path
     },
     dag=dag,
 )
 
+
+
+
 last_step = len(SPARK_STEPS) - 1 # this value will let the sensor know the last step to watch
 # wait for the steps to complete
-step_one_checker = EmrStepSensor(
-    task_id="watch_step_one",
+step_checker = EmrStepSensor(
+    task_id="watch_step",
     job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
     step_id="{{ task_instance.xcom_pull(task_ids='step_one', key='return_value')["
-    + str(last_step) + "] }}",
+    + str(last_step)
+    + "] }}",
     aws_conn_id="aws_default",
     dag=dag,
 )
 
-# Terminate the EMR cluster
+# #Terminate the EMR cluster
 # terminate_emr_cluster = EmrTerminateJobFlowOperator(
 #     task_id="terminate_emr_cluster",
 #     job_flow_id="{{ task_instance.xcom_pull(task_ids='create_emr_cluster', key='return_value') }}",
@@ -195,9 +171,9 @@ step_one_checker = EmrStepSensor(
 #     dag=dag,
 # )
 
-# end_data_pipeline = DummyOperator(task_id="end_data_pipeline", dag=dag)
+end_data_pipeline = DummyOperator(task_id="end_data_pipeline", dag=dag)
 
 # start_data_pipeline >> [data_to_s3, script_to_s3] >> create_emr_cluster
-start_data_pipeline >> create_emr_cluster >> step_one >> step_one_checker
+start_data_pipeline >> create_emr_cluster >> step_one >> step_checker >> end_data_pipeline
 # >> terminate_emr_cluster
 # terminate_emr_cluster >> end_data_pipeline

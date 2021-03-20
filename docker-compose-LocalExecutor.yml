@@ -35,6 +35,7 @@ services:
             - ./dags:/usr/local/airflow/dags
             - ./plugins:/usr/local/airflow/plugins
             - ./data:/usr/local/airflow/data
+            - ./scripts:/usr/local/airflow/scripts
             # for linux based systems
             - ./requirements.txt:/requirements.txt
             - ~/.aws:/usr/local/airflow/.aws/

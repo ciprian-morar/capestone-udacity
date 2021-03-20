@@ -7,9 +7,12 @@ from operators.load_to_s3 import LoadToS3Operator
 region_name = 'us-west-2'
 absolute_path='/usr/local/airflow'
 relative_path_data_source = '/data/source'
+relative_path_scripts_source = '/scripts/'
 default_args = {
     "owner": "airflow",
-    "start_date": datetime(2020, 10, 17),
+    "start_date": datetime(2016, 1, 1),
+    "depends_on_past": True,
+    "wait_for_downstream": True,
 }
 
 dag = DAG(
@@ -26,9 +29,32 @@ upload_additional_tables= LoadToS3Operator(
     dag=dag,
     aws_conn_id="aws_conn_id",
     bucket_name="capestone-udacity-project",
-    key="data",
+    key="data/source/staging/",
     relative_local_path=absolute_path + relative_path_data_source + "/additional_tables/",
     region_name=region_name
+)
+
+
+upload_csv_files= LoadToS3Operator(
+    task_id='Load_csv_to_s3',
+    dag=dag,
+    aws_conn_id="aws_conn_id",
+    bucket_name="capestone-udacity-project",
+    key="data/source/staging/",
+    relative_local_path=absolute_path + relative_path_data_source + "/csv_files/",
+    region_name=region_name
+)
+
+upload_scripts_files= LoadToS3Operator(
+    task_id='Load_scripts_to_s3',
+    dag=dag,
+    aws_conn_id="aws_conn_id",
+    bucket_name="capestone-udacity-project",
+    key="scripts/",
+    relative_local_path=absolute_path + relative_path_scripts_source,
+    region_name=region_name,
+    filename="spark.rar",
+    specific_file=True
 )
 
 
@@ -43,6 +69,6 @@ upload_additional_tables= LoadToS3Operator(
 end_data_pipeline = DummyOperator(task_id="end_data_pipeline", dag=dag)
 
 # start_data_pipeline >> [data_to_s3, script_to_s3] >> create_emr_cluster
-start_data_pipeline >> upload_additional_tables >> end_data_pipeline
+start_data_pipeline >> upload_additional_tables >> upload_csv_files >> upload_scripts_files >> end_data_pipeline
 # >> terminate_emr_cluster
 # terminate_emr_cluster >> end_data_pipeline

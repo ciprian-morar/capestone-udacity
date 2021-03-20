@@ -18,6 +18,8 @@ class LoadToS3Operator(BaseOperator):
                  key="",
                  relative_local_path="",
                  region_name="",
+                 filename=None,
+                 specific_file=False,
                  *args, **kwargs):
         super(LoadToS3Operator, self).__init__(*args, **kwargs)
         self.aws_conn_id = aws_conn_id
@@ -25,6 +27,8 @@ class LoadToS3Operator(BaseOperator):
         self.bucket_name = bucket_name
         self.relative_local_path = relative_local_path
         self.region_name=region_name
+        self.filename = filename
+        self.specific_file = specific_file
 
     def execute(self, context):
         # connect to redshift with the PostgresHook
@@ -32,10 +36,20 @@ class LoadToS3Operator(BaseOperator):
         s3 = S3Hook(aws_conn_id=self.aws_conn_id)
         check_bucket = s3.check_for_bucket(self.bucket_name)
         if check_bucket is not True:
-            s3.create_bucket(self.bucket_name)
+            s3.create_bucket(self.bucket_name, self.region_name)
         self.log.info(pathlib.Path(__file__).parent.absolute())
-        files = [self.relative_local_path + f for f in os.listdir(self.relative_local_path)]
-        self.log.info(files)
-        for f in files:
-            self.log.info(f)
-            s3.load_file(filename=f, bucket_name=self.bucket_name, replace=True, key=self.key)
+
+        # condition which uploading a specific file
+        if self.specific_file is True:
+            s3.load_file(filename=self.relative_local_path + self.filename,
+                         bucket_name=self.bucket_name, replace=True,
+                         key=self.key + self.filename)
+        else:
+            # condition which apply to upload more files in a directory
+            files = [self.relative_local_path + f
+                     for f in os.listdir(self.relative_local_path)]
+            self.log.info(files)
+            for f in files:
+                filename = f.split('/')[-1]
+                s3.load_file(filename=f, bucket_name=self.bucket_name,
+                             replace=True, key=self.key + filename)
