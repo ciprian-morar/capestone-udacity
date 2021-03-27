@@ -56,12 +56,10 @@ class LoadToRedshiftOperator(BaseOperator):
         self.s3_key = s3_key
         self.region = region
         self.aws_credentials_id = aws_credentials_id
-        self.start_date = kwargs['start_date']
-        self.execution_date = kwargs['execution_date']
         self.table_type = table_type
 
     def execute(self, context):
-        if self.table_type=="static" and self.execution_date > self.start_date + dt.timedelta(days=1):
+        if self.table_type=="static" and context['execution_date'] > context['start_date'] + dt.timedelta(days=1):
             return
         self.log.info('Starting Connect to Redshift')
         # connect to redshift

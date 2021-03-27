@@ -78,6 +78,7 @@ JOB_FLOW_OVERRIDES = {
         'Ec2KeyName': 'capestone',
         'EmrManagedMasterSecurityGroup': 'sg-005d2c716cf4f6962',
         'EmrManagedSlaveSecurityGroup': 'sg-03f5c655dc15cb7a8',
+        'Ec2SubnetId': 'subnet-209f436a'
     },
 
     "JobFlowRole": "EMR_EC2_DefaultRole",
@@ -105,46 +106,46 @@ SPARK_STEPS = [ # Note the params values are supplied to the operator
                     ],
                 },
         },
-        {
-            "Name": "Submit i94 data dictionary script",
-            "ActionOnFailure": "CANCEL_AND_WAIT",
-            "HadoopJarStep": {
-                "Jar": "command-runner.jar",
-                "Args": [
-                    "spark-submit",
-                    "--master",
-                    "yarn",
-                    "/home/hadoop/i94_data_dictionary.py",
-                    "--bucketName",
-                    "{{params.bucket_name}}",
-                    "--dataPathKey",
-                    "{{params.data_path_key}}",
-                    "--processedTablesKey",
-                    "{{params.processed_tables_key}}"
-                ],
-            },
-        },
-        {
-            "Name": "Submit demographics script",
-            "ActionOnFailure": "CANCEL_AND_WAIT",
-            "HadoopJarStep": {
-                "Jar": "command-runner.jar",
-                "Args": [
-                    "spark-submit",
-                    "--py-files",
-                    "/home/hadoop/common.py",
-                    "--master",
-                    "yarn",
-                    "/home/hadoop/demographics.py",
-                    "--bucketName",
-                    "{{params.bucket_name}}",
-                    "--dataPathKey",
-                    "{{params.data_path_key}}",
-                    "--processedTablesKey",
-                    "{{params.processed_tables_key}}"
-                ],
-            },
-        },
+        # {
+        #     "Name": "Submit i94 data dictionary script",
+        #     "ActionOnFailure": "CANCEL_AND_WAIT",
+        #     "HadoopJarStep": {
+        #         "Jar": "command-runner.jar",
+        #         "Args": [
+        #             "spark-submit",
+        #             "--master",
+        #             "yarn",
+        #             "/home/hadoop/i94_data_dictionary.py",
+        #             "--bucketName",
+        #             "{{params.bucket_name}}",
+        #             "--dataPathKey",
+        #             "{{params.data_path_key}}",
+        #             "--processedTablesKey",
+        #             "{{params.processed_tables_key}}"
+        #         ],
+        #     },
+        # },
+        # {
+        #     "Name": "Submit demographics script",
+        #     "ActionOnFailure": "CANCEL_AND_WAIT",
+        #     "HadoopJarStep": {
+        #         "Jar": "command-runner.jar",
+        #         "Args": [
+        #             "spark-submit",
+        #             "--py-files",
+        #             "/home/hadoop/common.py",
+        #             "--master",
+        #             "yarn",
+        #             "/home/hadoop/demographics.py",
+        #             "--bucketName",
+        #             "{{params.bucket_name}}",
+        #             "--dataPathKey",
+        #             "{{params.data_path_key}}",
+        #             "--processedTablesKey",
+        #             "{{params.processed_tables_key}}"
+        #         ],
+        #     },
+        # },
         {
                     "Name": "Submit check data quality script",
                     "ActionOnFailure": "CANCEL_AND_WAIT",
@@ -165,22 +166,6 @@ SPARK_STEPS = [ # Note the params values are supplied to the operator
                     },
                 },
 ]
-
-
-
-# {
-#     "Name": "Move scripts from S3 to HDFS",
-#     "ActionOnFailure": "CANCEL_AND_WAIT",
-#     "HadoopJarStep": {
-#         "Jar": "command-runner.jar",
-#         "Args": [
-#             "s3-dist-cp",
-#             "--src=s3://{{ params.bucket_name }}/data",
-#             "--dest=/movie",
-#         ],
-#     },
-# },
-#
 
 
 start_data_pipeline = DummyOperator(task_id="start_data_pipeline", dag=dag)
@@ -225,15 +210,15 @@ step_checker = EmrStepSensor(
 )
 
 # #Terminate the EMR cluster
-terminate_emr_cluster = EmrTerminateJobFlowOperator(
-    task_id="terminate_emr_cluster",
-    job_flow_id="{{ task_instance.xcom_pull(task_ids='create_emr_cluster', key='return_value') }}",
-    aws_conn_id="aws_default",
-    dag=dag,
-)
+# terminate_emr_cluster = EmrTerminateJobFlowOperator(
+#     task_id="terminate_emr_cluster",
+#     job_flow_id="{{ task_instance.xcom_pull(task_ids='create_emr_cluster', key='return_value') }}",
+#     aws_conn_id="aws_default",
+#     dag=dag,
+# )
 
 end_data_pipeline = DummyOperator(task_id="end_data_pipeline", dag=dag)
 
 
-start_data_pipeline >> create_emr_cluster >> step_one >> step_checker >> terminate_emr_cluster
-step_checker >> terminate_emr_cluster >> end_data_pipeline
+start_data_pipeline >> create_emr_cluster >> step_one >> step_checker #>> terminate_emr_cluster
+# step_checker >> terminate_emr_cluster >> end_data_pipeline

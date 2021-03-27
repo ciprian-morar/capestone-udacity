@@ -84,7 +84,7 @@ upload_scripts_files= LoadToS3Operator(
     key=scripts_path_key,
     relative_local_path=absolute_path_docker_machine + relative_path_scripts_source + "/",
     region_name=region_name,
-    filename = "immigration_data.py",
+    filename = "check_data_quality.py",
     specific_file = True
 )
 

@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import os
+import logging
 import configparser
 from airflow import DAG
 from airflow.operators.dummy_operator import DummyOperator
@@ -201,6 +202,8 @@ terminate_emr_cluster = EmrTerminateJobFlowOperator(
     dag=dag,
 )
 
+logging.error("error start_date %s", default_args.get("start_date"))
+
 load_stage_immigration_task_id = 'load_stage_immigration_subdag'
 load_immigration_to_redshift = SubDagOperator(
     subdag=get_s3_to_redshift_dag(
@@ -214,13 +217,13 @@ load_immigration_to_redshift = SubDagOperator(
         s3_key=processed_tables_key + "/immigration",
         region='us-west-2',
         table_type="variable",
-        start_date=default_args.get("start_date"),
-
+        start_date=default_args.get("start_date")
     ),
     task_id=load_stage_immigration_task_id,
-    dag=dag,
-    provide_context=True
+    dag=dag
 )
+
+
 
 load_dim_demo_task_id = 'load_dim_demo_subdag'
 load_demo_to_redshift = SubDagOperator(
@@ -235,11 +238,10 @@ load_demo_to_redshift = SubDagOperator(
         s3_key=processed_tables_key + "/demographics",
         region='us-west-2',
         table_type="static",
-        start_date=default_args.get("start_date"),
+        start_date=default_args.get("start_date")
     ),
     task_id=load_dim_demo_task_id,
-    dag=dag,
-    provide_context=True
+    dag=dag
 )
 
 load_stage_country_task_id = 'load_stage_country_subdag'
@@ -259,8 +261,7 @@ load_country_to_redshift = SubDagOperator(
 
     ),
     task_id=load_stage_country_task_id,
-    dag=dag,
-    provide_context=True
+    dag=dag
 )
 
 load_stage_port_task_id = 'load_stage_port_subdag'
@@ -276,12 +277,11 @@ load_port_to_redshift = SubDagOperator(
         s3_key=processed_tables_key + "/port-dict",
         region='us-west-2',
         table_type="static",
-        start_date=default_args.get("start_date"),
+        start_date=default_args.get("start_date")
 
     ),
     task_id=load_stage_port_task_id,
-    dag=dag,
-    provide_context=True
+    dag=dag
 )
 
 load_dim_visa_task_id = 'load_dim_visa_subdag'
@@ -297,12 +297,11 @@ load_visa_to_redshift = SubDagOperator(
         s3_key=processed_tables_key + "/visa",
         region='us-west-2',
         table_type="static",
-        start_date=default_args.get("start_date"),
+        start_date=default_args.get("start_date")
 
     ),
     task_id=load_dim_visa_task_id,
-    dag=dag,
-    provide_context=True
+    dag=dag
 )
 
 load_dim_mode_task_id = 'load_dim_mode_subdag'
@@ -318,12 +317,11 @@ load_mode_to_redshift = SubDagOperator(
         s3_key=processed_tables_key + "/mode",
         region='us-west-2',
         table_type="static",
-        start_date=default_args.get("start_date"),
+        start_date=default_args.get("start_date")
 
     ),
     task_id=load_dim_mode_task_id,
-    dag=dag,
-    provide_context=True,
+    dag=dag
 )
 
 load_person_dim_table = FillTablesOperator(
@@ -332,8 +330,7 @@ load_person_dim_table = FillTablesOperator(
     table="person_dim",
     redshift_conn_id="redshift",
     create_table=person_dim_table_create,
-    insert_table=person_dim_table_insert,
-    start_date=default_args.get("start_date")
+    insert_table=person_dim_table_insert
 )
 
 load_time_dim_table = FillTablesOperator(
@@ -342,8 +339,7 @@ load_time_dim_table = FillTablesOperator(
     table="time_dim",
     redshift_conn_id="redshift",
     create_table=time_dim_table_create,
-    insert_table=time_dim_table_insert,
-    start_date=default_args.get("start_date")
+    insert_table=time_dim_table_insert
 )
 
 load_imm_fact_table = FillTablesOperator(
@@ -352,8 +348,7 @@ load_imm_fact_table = FillTablesOperator(
     table="imm_fact",
     redshift_conn_id="redshift",
     create_table=imm_fact_table_create,
-    insert_table=imm_fact_table_insert,
-    start_date=default_args.get("start_date")
+    insert_table=imm_fact_table_insert
 )
 
 query_checks=[
