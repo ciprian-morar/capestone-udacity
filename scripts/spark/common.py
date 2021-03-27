@@ -1,5 +1,3 @@
-
-
 def get_first_category_per_state(spark, dataframe, column, group_by):
     dataframe.createOrReplaceTempView("dataframe")
     dataframe_table = spark.sql("""
@@ -27,4 +25,20 @@ def get_first_category_per_state(spark, dataframe, column, group_by):
         WHERE row_number = 1 
     """.format(column, group_by))
 
+    return table_final
+
+
+#calculate distribution for categories
+def calculate_distribution(x, y):
+    distribution = (x / y) * 100
+    return f'{distribution:.2f}%'
+
+def get_number_average_per_state(spark, dataframe, column, group_by):
+    dataframe.createOrReplaceTempView("dataframe")
+    table_final = spark.sql("""
+        SELECT
+        {1}, avg({0}) as avg_all
+          FROM dataframe
+          GROUP BY {1}
+    """.format(column, group_by))
     return table_final

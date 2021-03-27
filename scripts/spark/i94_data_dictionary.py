@@ -1,12 +1,30 @@
 import os
 import pyspark.sql.functions as F
+import pyspark.sql.types as T
 from pyspark.sql import SparkSession
+import argparse
 
-bucket = "s3a://capestone-udacity-project/"
-i94_codes_path = "data/source/staging/"
-file_names = {"airport_file" : "i94prtl.txt",
+parser = argparse.ArgumentParser()
+
+parser.add_argument("--bucketName", help="the name of the bucket")
+parser.add_argument("--dataPathKey", help="the name of the bucket")
+parser.add_argument("--processedTablesKey", help="the name of the bucket")
+args = parser.parse_args()
+bucket_name=None
+data_path_key=None
+processed_tables_key=None
+if args.bucketName:
+    bucket_name = args.bucketName
+if args.dataPathKey:
+    data_path_key = args.dataPathKey
+if args.processedTablesKey:
+    processed_tables_key = args.processedTablesKey
+
+bucket = "s3a://" + bucket_name + "/"
+data_path_key = data_path_key + "/"
+file_names = {"state_file":"i94addrl.txt",
 "country_file" :"i94cntyl.txt",
-"state_file":"i94addrl.txt",
+"airport_file" : "i94prtl.txt",
 "model_file":"i94model.txt",
 "visa_file":"i94visa.txt"}
 
@@ -44,6 +62,12 @@ def process_state_file(spark, input_data, output_data):
     df_state = removeTabs(df_state, input_data)
     # trim strings
     df_state = trimStrings(df_state, input_data)
+    # assure the columns are delivered in the right data type
+    df_state = df_state \
+        .withColumn("state_code", F.col("state_code") \
+                    .cast(T.StringType)) \
+        .withColumn("state", F.col("state")\
+                    .cast(T.StringType))
     # write state data on s3 parquet
     df_state.write.mode("overwrite").parquet(output_data + "state")
 
@@ -63,6 +87,11 @@ def process_country_file(spark, input_data, output_data):
         .withColumn("country",
           F.regexp_replace(df_country.country,
           "^INVALID.*|Collapsed.*|No Country.*", "INVALID"))
+    # assure the columns are delivered in the right data type
+    df_country = df_country \
+        .withColumn("country_code", F.col("country_code") \
+                    .cast(T.StringType)) \
+        .withColumn("country", F.col("country").cast(T.StringType))
     df_country.write.mode("overwrite").parquet(output_data + "country")
 
 def process_airport_file(spark, input_data, output_data):
@@ -84,25 +113,38 @@ def process_airport_file(spark, input_data, output_data):
     # trim spaces
     df_airport = trimStrings(df_airport, input_data)
     # get state data from s3
-    df_state = spark.read.parquet(os.path.join(output_data, 'state'))
+    df_state = spark.read.parquet(output_data + 'state')
     # join dataframes airport with state
     df_airport = df_airport.join(df_state, ['state_code'])
-    df_airport.write.mode("overwrite").parquet(output_data + "airport-dict")
+    # assure the columns are delivered in the right data type
+    df_airport = df_airport\
+        .withColumn("port_code", F.col("port_code") \
+                                   .cast(T.StringType))\
+        .withColumn("city", F.col("city")\
+                    .cast(T.StringType))\
+        .withColumn("state_code", F.col("state_code")\
+                    .cast(T.StringType))
+    df_airport.write.mode("overwrite").parquet(output_data + "port-dict")
 
 def process_model_file(spark, input_data, output_data):
-    df_model = spark.read.options(delimiter="=", header=False).csv(input_data)
+    df_mode = spark.read.options(delimiter="=", header=False).csv(input_data)
     # columns in model dataframe = [model_code, model]
-    df_model = df_model.withColumnRenamed("_c0", "model_code").withColumnRenamed("_c1", "model")
-    input_data = ['model']
+    df_mode = df_mode.withColumnRenamed("_c0", "mode_code")\
+        .withColumnRenamed("_c1", "mode")
+    input_data = ['mode']
     # remove single quotes
-    df_model = removeSingleQuotes(df_model, input_data)
+    df_mode = removeSingleQuotes(df_mode, input_data)
     # remove tab spaces
-    input_data = ['model', 'model_code']
+    input_data = ['mode', 'mode_code']
     # remove tab spaces
-    df_model = removeTabs(df_model, input_data)
+    df_model = removeTabs(df_mode, input_data)
     # trim spaces
     df_model = trimStrings(df_model, input_data)
-    df_model.write.mode("overwrite").parquet(output_data + "model")
+    # assure the columns are delivered in the right data type
+    df_model = df_model.withColumn("mode_code", F.col("mode_code")\
+                                   .cast(T.IntegerType))\
+        .withColumn("mode", F.col("mode").cast(T.StringType))
+    df_model.write.mode("overwrite").parquet(output_data + "mode")
 
 def process_visa_file(spark, input_data, output_data):
     df_visa = spark.read.options(delimiter="=", header=False).csv(input_data)
@@ -115,6 +157,10 @@ def process_visa_file(spark, input_data, output_data):
     df_visa = removeTabs(df_visa, input_data)
     # trim spaces
     df_visa = trimStrings(df_visa, input_data)
+    # assure the columns are delivered in the right data type
+    df_visa = df_visa.withColumn("visa_code", F.col("visa_code")\
+                                   .cast(T.IntegerType))\
+        .withColumn("visa", F.col("visa").cast(T.StringType))
     df_visa.write.mode("overwrite").parquet(output_data + "visa")
 
 
@@ -122,8 +168,8 @@ if __name__ == "__main__":
     spark = create_spark_session()
 
     for key, value in file_names.items():
-        input_data = os.path.join(bucket, i94_codes_path + value)
-        output_data = bucket + "output/"
+        input_data = bucket + data_path_key + value
+        output_data = bucket + processed_tables_key + "/"
         # call functions dinamically
         process_func = globals()["process_" + key]
         process_func(spark, input_data, output_data)

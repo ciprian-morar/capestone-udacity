@@ -43,13 +43,17 @@ class LoadToS3Operator(BaseOperator):
         if self.specific_file is True:
             s3.load_file(filename=self.relative_local_path + self.filename,
                          bucket_name=self.bucket_name, replace=True,
-                         key=self.key + self.filename)
+                         key=self.key + "/"  + self.filename)
         else:
-            # condition which apply to upload more files in a directory
+            #condition which apply to upload more files in a directory
             files = [self.relative_local_path + f
                      for f in os.listdir(self.relative_local_path)]
-            self.log.info(files)
+            #self.log.info(files)
+            # files_array = []
+            # for subdir, dirs, files in os.walk(self.relative_local_path):
+            #     for file in files:
+            #         files_array.append(os.path.join(subdir, file))
             for f in files:
                 filename = f.split('/')[-1]
                 s3.load_file(filename=f, bucket_name=self.bucket_name,
-                             replace=True, key=self.key + filename)
+                             replace=True, key=self.key +"/" + filename)

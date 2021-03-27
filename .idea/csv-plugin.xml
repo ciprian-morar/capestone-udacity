@@ -24,6 +24,20 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\dags\dwh_dag.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\dags\process_dag.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\dags\scripts\spark\airport-codes.py">
           <value>
             <Attribute>
@@ -74,6 +88,27 @@
           </value>
         </entry>
         <entry key="\plugins\operators\load_to_s3.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\scripts\check_dwh_cluster.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\scripts\spark\i94_data_dictionary.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\scripts\spark\immigration_data.py">
           <value>
             <Attribute>
               <option name="separator" value="," />

@@ -5,39 +5,27 @@ from pyspark.sql.functions import udf, trim, lower
 from pyspark.sql.types import StringType
 from pyspark.sql import SparkSession
 
+from common import get_first_category_per_state, calculate_distribution
+import argparse
 
-def calculate_distribution(x, y):
-    distribution = (x / y) * 100
-    return f'{distribution:.2f}%'
+parser = argparse.ArgumentParser()
 
-def get_first_category_per_state(spark, dataframe, column, group_by):
-    dataframe.createOrReplaceTempView("dataframe")
-    dataframe_table = spark.sql("""
-        SELECT
-        {1}, {0}, count(*) as count_all
-          FROM dataframe
-          GROUP BY {1}, {0} 
-    """.format(column, group_by))
+parser.add_argument("--bucketName", help="the name of the bucket")
+parser.add_argument("--dataPathKey", help="the name of the bucket")
+parser.add_argument("--processedTablesKey", help="the name of the bucket")
+args = parser.parse_args()
+bucket_name=None
+data_path_key=None
+processed_tables_key=None
+if args.bucketName:
+    bucket_name = args.bucketName
+if args.dataPathKey:
+    data_path_key = args.dataPathKey
+if args.processedTablesKey:
+    processed_tables_key = args.processedTablesKey
 
-    dataframe_table.createOrReplaceTempView("df_all_table")
-
-    row_number_table = spark.sql("""
-           SELECT
-            {1},
-            {0},
-            row_number() over (partition by {1} order by count_all desc) as row_number
-          FROM df_all_table
-    """.format(column, group_by))
-
-    row_number_table.createOrReplaceTempView("row_number_table")
-
-    table_final = spark.sql("""
-        SELECT {1}, {0}
-        FROM row_number_table
-        WHERE row_number = 1 
-    """.format(column, group_by))
-
-    return table_final
+bucket = "s3a://" + bucket_name + "/"
+data_path_key = data_path_key + "/"
 
 
 def create_spark_session():
@@ -80,15 +68,23 @@ def process_demographics(spark, input_data, output_data):
     df_demo = df_demo.withColumn("female_distribution",
                                  calculate_distribution_udf(F.col('sum_female_population'),
                                                             F.col('sum_all_population')))
-    # df_state = spark.read.parquet(output_data + "state")
-    # df_demo = df_demo.join(df_state, df_demo.state_code==df_state.code, how="inner")
-    # df_demo = df_demo.withColumn("city", lower(trim(df_demo.city)))
+    df_demo = df_demo["state_code", "state", "male_distribution",
+                      "female_distribution", "median_age", "race"]
+    # assure the columns are delivered in the right data type
+    df_demo = df_demo \
+        .withColumn("state_code", F.col("state_code") \
+                    .cast(T.StringType)) \
+        .withColumn("state", F.col("state").cast(T.StringType))\
+        .withColumn("male_distribution", F.col("male_distribution").cast(T.StringType)) \
+        .withColumn("female_distribution", F.col("female_distribution").cast(T.StringType)) \
+        .withColumn("median_age", F.col("median_age").cast(T.IntegerType)) \
+        .withColumn("race", F.col("race").cast(T.StringType))
     df_demo.write.mode("overwrite").partitionBy("state_code", "race").parquet(output_data + 'demographics')
 
 
 if __name__ == "__main__":
     spark = create_spark_session()
-    input_data="s3a://capestone-project-udacity-ciprian/data/source/demographics/us-cities-demographics.csv"
-    output_data="s3a://capestone-project-udacity-ciprian/output/"
+    input_data = bucket + data_path_key + "us-cities-demographics.csv"
+    output_data = bucket + processed_tables_key + "/"
     process_demographics(spark, input_data, output_data)
     spark.stop()

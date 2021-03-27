@@ -1,66 +1,104 @@
 import datetime as dt
 import pyspark.sql.functions as F
+import pyspark.sql.types as T
+from pyspark.sql.functions import udf
 import os
 from pyspark.sql import SparkSession
 import datetime
+import argparse
+from spark_datetime import get_datetime, datetimeToYear, \
+    datetimeToHour, datetimeToWeek, datetimeToDay, datetimeToMonth,\
+    datetimeToWeekDay, udf_date_timedelta
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument("--bucketName", help="the name of the bucket")
+parser.add_argument("--dataPathKey", help="the name of the data AWS key")
+parser.add_argument("--processedTablesKey", help="the name of AWS key where to output data")
+parser.add_argument("--dateString", help="""current date to extract the data related 
+to actual running date; format 2016-04-06""")
+args = parser.parse_args()
+bucket_name=None
+data_path_key=None
+processed_tables_key=None
+date_string=None
+if args.bucketName:
+    bucket_name = args.bucketName
+if args.dataPathKey:
+    data_path_key = args.dataPathKey
+if args.processedTablesKey:
+    processed_tables_key = args.processedTablesKey
+if args.dateString:
+    date_string=args.dateString
+
+bucket = "s3a://" + bucket_name + "/"
+data_path_key = data_path_key + "/"
 
 def create_spark_session():
     spark = SparkSession.builder.appName("Immigration Data").getOrCreate()
     return spark
 
-udf_date_timedelta = F.udf(lambda x: (dt.datetime(1960, 1, 1).date() + dt.timedelta(int(float(x)))).isoformat() if x else None)
-
-def get_months_list():
-    months_choices = []
-    for i in range(1,13):
-        months_choices.append((i, datetime.date(2016, i, 1).strftime('%b')))
-    return months_choices
-
-def get_immigration_files(spark, input_data, output_data):
-    months = get_months_list()
-    paths = []
-    for key, value in months.items():
-        process_immigration_data(spark, input_data, output_data, value)
-
-def process_immigration_data(spark, input_data, output_data, month, year):
+def process_immigration_data(spark, input_data, output_data, date_string):
     # Extract the last two digits from the year
     # year_last_two_digits = int(str(year)[-2:])
     # comment big data path
     # path =  input_data + "i94_{0}{1}_sub.sas7bdat".format(month, year_last_two_digits)
     # df_spark = spark.read.format('com.github.saurfang.sas.spark').load(path)
+    # df_immigration_data = df_immigration_data.filter('date="2016-04-06"')
     df_immigration_data = spark.read.options(delimiter=",", header=True, encoding="UTF-8").csv(
-        "s3://capestone-project-udacity-ciprian/data/immigration_data_sample/immigration_data_sample.csv")
-    df_immigration_data = df_immigration_data.withColumn("arrdate", udf_date_timedelta(df_immigration_data.arrdate))
+        input_data)
+    # filter results where arrival date is null
+    df_immigration_data = df_immigration_data.filter(df_immigration_data.arrdate.isNotNull())
+    # filter records which have values for the column i94addr (state_code) NULL
+    df_immigration_data = df_immigration_data.filter(df_immigration_data.i94addr.isNotNull())
 
-    # df_model = spark.read.parquet(output_data + "model")
-    # df_state = spark.read.parquet(output_data + "state")
-    # df_country = spark.read.parquet(output_data + "country")
-    # df_visa = spark.read.parquet(output_data + "visa")
-    #
-    # df_spark.createOrReplaceTempView("df_spark_view")
-    # df_state.createOrReplaceTempView("df_state")
-    # df_visa.createOrReplaceTempView("df_visa")
-    # df_model.createOrReplaceTempView("df_model")
-    # df_country.createOrReplaceTempView("df_country")
+    ### Set columns for time table
+    # Set arrdate as integer because it is a timestamp
+    df_immigration_data = df_immigration_data.withColumn("arrdate", df_immigration_data.arrdate.cast("integer"))
+    # transform the timestamp in a date
+    df_immigration_data = df_immigration_data.withColumn("date",
+                                                         udf_date_timedelta(df_immigration_data.arrdate).cast("date"))
+    #transform timestamp in a datetime object
+    df_immigration_data = df_immigration_data.withColumn("datetime", get_datetime(df_immigration_data.arrdate))
+    # get the day and other data details
+    df_immigration_data = df_immigration_data.withColumn('day', datetimeToDay(df_immigration_data.date))
+    df_immigration_data = df_immigration_data.withColumnRenamed('i94yr', 'year')
+    df_immigration_data = df_immigration_data.withColumn('hour', datetimeToHour(df_immigration_data.datetime))
+    df_immigration_data = df_immigration_data.withColumn('week', datetimeToWeek(df_immigration_data.date))
+    df_immigration_data = df_immigration_data.withColumn('day', datetimeToDay(df_immigration_data.date))
+    df_immigration_data = df_immigration_data.withColumnRenamed('i94mon', 'month')
+    df_immigration_data = df_immigration_data.withColumn('weekday', datetimeToWeekDay(df_immigration_data.date))
 
-    df_immigration_data = df_immigration_data['i94yr', 'i94mon', 'i94cit', 'i94res','i94port','arrdate', 'i94mode', 'i94addr','i94bir','i94visa','occup','gender']
-    df_immigration_data = df_immigration_data.withColumnRenamed("i94yr", "year")\
-        .withColumnRenamed("i94mon", "month")\
-        .withColumnRenamed("i94cit", "birth_country")\
-        .withColumnRenamed("i94res", "residence_country") \
-        .withColumnRenamed("i94port", "port_code")\
-        .withColumnRenamed("i94mode", "mode_code")\
-        .withColumnRenamed("i94addr", "state_code") \
-        .withColumnRenamed("i94bir", "age") \
-        .withColumnRenamed("i94visa", "visa")
-    df_immigration_data.write.mode("overwrite").partitionBy("year", "month", "state_code", "port_code").parquet(
+    df_immigration_data = df_immigration_data['admnum', 'arrdate', 'year', 'month', 'day', 'weekday', 'hour', 'week',
+                                              'i94cit', 'i94res', 'i94bir', 'i94port', 'i94mode',  'i94addr','i94visa','gender']
+    # assure the columns are delivered in the right data type
+    df_immigration_data = df_immigration_data \
+        .withColumn("admnum", F.col("admnum") \
+                    .cast(T.StringType)) \
+        .withColumn("arrdate", F.col("arrdate").cast(T.TimestampType)) \
+        .withColumn("year", F.col("year").cast(T.IntegerType)) \
+        .withColumn("month", F.col("month").cast(T.IntegerType)) \
+        .withColumn("day", F.col("day").cast(T.IntegerType)) \
+        .withColumn("weekday", F.col("weekday").cast(T.StringType)) \
+        .withColumn("hour", F.col("hour").cast(T.IntegerType)) \
+        .withColumn("week", F.col("week").cast(T.IntegerType)) \
+        .withColumn("i94cit", F.col("i94cit").cast(T.StringType)) \
+        .withColumn("i94res", F.col("i94res").cast(T.StringType)) \
+        .withColumn("i94bir", F.col("i94bir").cast(T.IntegerType)) \
+        .withColumn("i94port", F.col("i94port").cast(T.StringType)) \
+        .withColumn("i94mode", F.col("i94mode").cast(T.IntegerType)) \
+        .withColumn("i94addr", F.col("i94addr").cast(T.StringType)) \
+        .withColumn("i94visa", F.col("i94visa").cast(T.IntegerType)) \
+        .withColumn("gender", F.col("gender").cast(T.StringType))
+    df_immigration_data.write.mode("overwrite")\
+        .partitionBy("year", "month", "day", "i94addr", "i94port").parquet(
         output_data + "immigration")
 
 
 
 if __name__ == "__main__":
     spark = create_spark_session()
-    input_data = "s3a://capestone-project-udacity-ciprian/data/source/i94_immigration_data/18-83510-I94-Data-2016/"
-    output_data = "s3a://capestone-project-udacity-ciprian/output/"
-    process_immigration_data(spark, input_data, output_data, "apr", 2016)
+    input_data = bucket + data_path_key + "immigration_data_sample.csv"
+    output_data = bucket + processed_tables_key + "/"
+    process_immigration_data(spark, input_data, output_data, date_string)
     spark.stop()
