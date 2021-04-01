@@ -40,7 +40,6 @@ services:
             - ./requirements.txt:/requirements.txt
             - ~/.aws:/usr/local/airflow/.aws/
             - ./temp:/temp
-            - ./setup/raw_input_data:/data
         ports:
             - "8080:8080"
         command: webserver

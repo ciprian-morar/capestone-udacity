@@ -53,7 +53,9 @@ def get_s3_to_redshift_dag(
         s3_key=s3_key,
         region=region,
         table_type=table_type,
-        provide_context=True
+        provide_context=True,
+        start_date=kwargs['start_date']
+
     )
 
     # check table task

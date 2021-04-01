@@ -8,7 +8,7 @@ from operators.load_to_s3 import LoadToS3Operator
 
 config = configparser.ConfigParser()
 try:
-    config.read('/usr/local/airflow/dags/ini.cfg')
+    config.read('/usr/local/airflow/dags/init.cfg')
 except Exception as e:
     print(str(e), 'coud not read configuration file')
 
@@ -43,28 +43,52 @@ dag = DAG(
 start_data_pipeline = DummyOperator(task_id="start_data_pipeline", dag=dag)
 
 #upload dictionaries files
-# upload_additional_tables= LoadToS3Operator(
-#     task_id='Load_dict_tables_to_s3',
-#     dag=dag,
-#     aws_conn_id="aws_default",
-#     bucket_name="original-demo-ciprian",
-#     key=data_path_key,
-#     relative_local_path=absolute_path_docker_machine + relative_path_data_source + "/additional_tables/",
-#     region_name=region_name
-# )
+upload_additional_tables= LoadToS3Operator(
+    task_id='Load_dict_tables_to_s3',
+    dag=dag,
+    aws_conn_id="aws_default",
+    bucket_name=bucket_name,
+    key=data_path_key,
+    relative_local_path=absolute_path_docker_machine + relative_path_data_source + "/additional_tables/",
+    region_name=region_name
+)
 #
 # upload data csv files
-# upload_csv_files= LoadToS3Operator(
-#     task_id='Load_csv_to_s3',
-#     dag=dag,
-#     aws_conn_id="aws_default",
-#     bucket_name="original-demo-ciprian",
-#     key=data_path_key,
-#     relative_local_path=absolute_path_docker_machine + relative_path_data_source + "/csv_files/",
-#     region_name=region_name
-# )
+upload_csv_files= LoadToS3Operator(
+    task_id='Load_csv_to_s3',
+    dag=dag,
+    aws_conn_id="aws_default",
+    bucket_name=bucket_name,
+    key=data_path_key,
+    relative_local_path=absolute_path_docker_machine + relative_path_data_source + "/csv_files/",
+    region_name=region_name
+)
 
 # upload emr scripts to s3
+upload_scripts_files= LoadToS3Operator(
+    task_id='Load_scripts_to_s3',
+    dag=dag,
+    aws_conn_id="aws_default",
+    bucket_name=bucket_name,
+    key=scripts_path_key,
+    relative_local_path=absolute_path_docker_machine + relative_path_scripts_source + "/",
+    region_name=region_name,
+)
+
+# upload data sas7bdat files
+upload_sas_files= LoadToS3Operator(
+    task_id='Load_sas_to_s3',
+    dag=dag,
+    aws_conn_id="aws_default",
+    bucket_name=bucket_name,
+    key=data_path_key,
+    relative_local_path=absolute_path_docker_machine + relative_path_data_source + "/i94_immigration_data/18-83510-I94-Data-2016/",
+    region_name=region_name,
+    filename="i94_apr16_sub.sas7bdat",
+    specific_file=True
+)
+
+#upload a specific file
 # upload_scripts_files= LoadToS3Operator(
 #     task_id='Load_scripts_to_s3',
 #     dag=dag,
@@ -73,24 +97,13 @@ start_data_pipeline = DummyOperator(task_id="start_data_pipeline", dag=dag)
 #     key=scripts_path_key,
 #     relative_local_path=absolute_path_docker_machine + relative_path_scripts_source + "/",
 #     region_name=region_name,
+#     filename = "immigration_data.py",
+#     specific_file = True
 # )
-
-#upload a specific file
-upload_scripts_files= LoadToS3Operator(
-    task_id='Load_scripts_to_s3',
-    dag=dag,
-    aws_conn_id="aws_default",
-    bucket_name="original-demo-ciprian",
-    key=scripts_path_key,
-    relative_local_path=absolute_path_docker_machine + relative_path_scripts_source + "/",
-    region_name=region_name,
-    filename = "check_data_quality.py",
-    specific_file = True
-)
 
 end_data_pipeline = DummyOperator(task_id="end_data_pipeline", dag=dag)
 
 
-start_data_pipeline >> upload_scripts_files >> end_data_pipeline
-# start_data_pipeline >> upload_additional_tables >> upload_csv_files >> upload_scripts_files >> end_data_pipeline
+# start_data_pipeline >> upload_scripts_files >> end_data_pipeline
+start_data_pipeline >> upload_additional_tables >> upload_csv_files >> upload_scripts_files >> upload_sas_files >>  end_data_pipeline
 

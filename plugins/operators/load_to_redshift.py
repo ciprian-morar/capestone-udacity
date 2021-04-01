@@ -18,7 +18,6 @@ class LoadToRedshiftOperator(BaseOperator):
         FROM '{}'
         ACCESS_KEY_ID '{}'
         SECRET_ACCESS_KEY '{}'
-        REGION '{}'
         FORMAT AS PARQUET
     """
 
@@ -32,8 +31,11 @@ class LoadToRedshiftOperator(BaseOperator):
     #         s3_bucket (string): s3 bucket
     #         s3_key (string): s3 key
     #         region (string): the location of the s3 and redshift cluster
-    #         parquet (string): copy from parquet format
-
+    #         table_type (string): table type static and variable
+    #                              static: the data in this table is inserted
+    #                              only first time in a loop
+    #                              variable: we change the data on every iteration
+    #                              in the loop
     #     '''
     @apply_defaults
     def __init__(self,
@@ -57,9 +59,10 @@ class LoadToRedshiftOperator(BaseOperator):
         self.region = region
         self.aws_credentials_id = aws_credentials_id
         self.table_type = table_type
+        self.start_date = kwargs['start_date']
 
     def execute(self, context):
-        if self.table_type=="static" and context['execution_date'] > context['start_date'] + dt.timedelta(days=1):
+        if self.table_type=="static" and context['execution_date'] >= (self.start_date + dt.timedelta(days=1)):
             return
         self.log.info('Starting Connect to Redshift')
         # connect to redshift
@@ -67,12 +70,12 @@ class LoadToRedshiftOperator(BaseOperator):
         credentials = aws_hook.get_credentials()
         redshift = PostgresHook(postgres_conn_id=self.redshift_conn_id)
 
-        self.log.info("Create Redshift table")
-        redshift.run(self.create_sql_stmt)
-
         self.log.info("Clearing data from destination Redshift table")
 
-        redshift.run("DELETE FROM {}".format(self.table))
+        redshift.run("DROP TABLE {}".format(self.table))
+
+        self.log.info("Create Redshift table")
+        redshift.run(self.create_sql_stmt)
 
         self.log.info("Copying data from S3 to Redshift")
 
@@ -83,7 +86,6 @@ class LoadToRedshiftOperator(BaseOperator):
             s3_path,
             credentials.access_key,
             credentials.secret_key,
-            self.region,
         )
         # load the data from S3 to redshift
         redshift.run(formatted_sql)

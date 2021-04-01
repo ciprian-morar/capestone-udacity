@@ -31,6 +31,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\dags\ini.cfg">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\dags\process_dag.py">
           <value>
             <Attribute>
@@ -87,6 +94,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\plugins\helpers\sql_queries.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\plugins\operators\load_to_s3.py">
           <value>
             <Attribute>
@@ -95,6 +109,13 @@
           </value>
         </entry>
         <entry key="\scripts\check_dwh_cluster.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\scripts\spark\common.py">
           <value>
             <Attribute>
               <option name="separator" value="," />

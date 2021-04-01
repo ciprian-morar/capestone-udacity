@@ -7,6 +7,7 @@ from airflow.operators.dummy_operator import DummyOperator
 from airflow.operators.subdag_operator import SubDagOperator
 from operators.load_to_s3 import LoadToS3Operator
 from operators.tables_redshift import FillTablesOperator
+from operators.emr_add_steps import MyEmrAddStepsOperator
 from operators.data_quality import DataQualityOperator
 from airflow.operators import PythonOperator
 from airflow.contrib.operators.emr_create_job_flow_operator import (
@@ -28,7 +29,7 @@ from helpers.sql_queries import imm_stage_table_create, demo_dim_table_create, \
 from dwh_subdag import get_s3_to_redshift_dag
 
 config = configparser.ConfigParser()
-config.read('/usr/local/airflow/dags/ini.cfg')
+config.read('/usr/local/airflow/dags/init.cfg')
 
 bucket_name = config['AWS']['bucket_name']
 region_name = config['AWS']['region_name']
@@ -36,10 +37,12 @@ scripts_path_key = config['AWS']['scripts_path_key']
 data_path_key = config['AWS']['data_path_key']
 bucket_logs = config['AWS']['bucket_logs']
 processed_tables_key = config['AWS']['processed_tables_key']
+ec2_key_name=config['AWS']['ec2_key_name']
 
 default_args = {
     "owner": "airflow",
     "start_date": datetime(2016, 4, 1),
+    "end_date": datetime(2016, 4, 2),
     "depends_on_past": True,
     "wait_for_downstream": True,
 }
@@ -48,7 +51,7 @@ dag = DAG(
     "dwh_dag",
     default_args=default_args,
     description='Load and transform data in Redshift with Airflow',
-    schedule_interval=None,
+    schedule_interval='@daily',
     max_active_runs=1,
 )
 
@@ -88,9 +91,9 @@ JOB_FLOW_OVERRIDES = {
         ],
         "KeepJobFlowAliveWhenNoSteps": True,
         "TerminationProtected": False, # this lets us programmatically terminate the cluster
-        'Ec2KeyName': 'capestone',
-        'EmrManagedMasterSecurityGroup': 'sg-005d2c716cf4f6962',
-        'EmrManagedSlaveSecurityGroup': 'sg-03f5c655dc15cb7a8',
+        'Ec2KeyName': ec2_key_name,
+        # 'EmrManagedMasterSecurityGroup': 'sg-005d2c716cf4f6962',
+        # 'EmrManagedSlaveSecurityGroup': 'sg-03f5c655dc15cb7a8',
     },
 
     "JobFlowRole": "EMR_EC2_DefaultRole",
@@ -100,7 +103,7 @@ JOB_FLOW_OVERRIDES = {
 
 SPARK_STEPS = [ # Note the params values are supplied to the operator
         {
-                "Name": "Move raw data from S3 to HDFS",
+                "Name": "Move python scripts from S3 to EMR cluster",
                 "ActionOnFailure": "CANCEL_AND_WAIT",
                 "HadoopJarStep": {
                     "Jar": "command-runner.jar",
@@ -115,12 +118,28 @@ SPARK_STEPS = [ # Note the params values are supplied to the operator
                 },
         },
         {
+                        "Name": "Remove data from immigration",
+                        "ActionOnFailure": "CANCEL_AND_WAIT",
+                        "HadoopJarStep": {
+                            "Jar": "command-runner.jar",
+                            "Args": [
+                                "aws",
+                                "s3",
+                                "rm",
+                                "s3://{{ params.bucket_name }}/{{params.processed_tables_key}}/immigration",
+                                "--recursive"
+                            ],
+                        },
+                },
+        {
                     "Name": "Submit immigration script",
                     "ActionOnFailure": "CANCEL_AND_WAIT",
                     "HadoopJarStep": {
                         "Jar": "command-runner.jar",
                         "Args": [
                             "spark-submit",
+                            "--packages",
+                            "saurfang:spark-sas7bdat:2.0.0-s_2.11",
                             "--py-files",
                             "/home/hadoop/common.py,/home/hadoop/spark_datetime.py",
                             "--master",
@@ -131,7 +150,9 @@ SPARK_STEPS = [ # Note the params values are supplied to the operator
                             "--dataPathKey",
                             "{{params.data_path_key}}",
                             "--processedTablesKey",
-                            "{{params.processed_tables_key}}"
+                            "{{params.processed_tables_key}}",
+                            "--executionDate",
+                            "{{ds}}"
                         ],
                     },
                 },
@@ -142,6 +163,8 @@ SPARK_STEPS = [ # Note the params values are supplied to the operator
                         "Jar": "command-runner.jar",
                         "Args": [
                             "spark-submit",
+                            "--py-files",
+                            "/home/hadoop/common.py",
                             "--master",
                             "yarn",
                             "/home/hadoop/check_data_quality.py",
@@ -165,7 +188,7 @@ create_emr_cluster = EmrCreateJobFlowOperator(
 )
 
 # Add your steps to the EMR cluster
-step_one = EmrAddStepsOperator(
+step_one = MyEmrAddStepsOperator(
     task_id="step_one",
     job_flow_id="{{ task_instance.xcom_pull(task_ids='create_emr_cluster', key='return_value') }}",
     aws_conn_id="aws_default",
@@ -202,8 +225,6 @@ terminate_emr_cluster = EmrTerminateJobFlowOperator(
     dag=dag,
 )
 
-logging.error("error start_date %s", default_args.get("start_date"))
-
 load_stage_immigration_task_id = 'load_stage_immigration_subdag'
 load_immigration_to_redshift = SubDagOperator(
     subdag=get_s3_to_redshift_dag(
@@ -220,7 +241,8 @@ load_immigration_to_redshift = SubDagOperator(
         start_date=default_args.get("start_date")
     ),
     task_id=load_stage_immigration_task_id,
-    dag=dag
+    dag=dag,
+    provide_context=True
 )
 
 
@@ -232,7 +254,7 @@ load_demo_to_redshift = SubDagOperator(
         load_dim_demo_task_id,
         "redshift",
         "aws_default",
-        "dim_demo",
+        "demo_dim",
         create_sql_stmt=demo_dim_table_create,
         s3_bucket=bucket_name,
         s3_key=processed_tables_key + "/demographics",
@@ -241,7 +263,8 @@ load_demo_to_redshift = SubDagOperator(
         start_date=default_args.get("start_date")
     ),
     task_id=load_dim_demo_task_id,
-    dag=dag
+    dag=dag,
+    provide_context=True
 )
 
 load_stage_country_task_id = 'load_stage_country_subdag'
@@ -261,18 +284,19 @@ load_country_to_redshift = SubDagOperator(
 
     ),
     task_id=load_stage_country_task_id,
-    dag=dag
+    dag=dag,
+    provide_context=True
 )
 
-load_stage_port_task_id = 'load_stage_port_subdag'
+load_dim_port_task_id = 'load_dim_port_subdag'
 load_port_to_redshift = SubDagOperator(
     subdag=get_s3_to_redshift_dag(
         "dwh_dag",
-        load_stage_port_task_id,
+        load_dim_port_task_id,
         "redshift",
         "aws_default",
-        "port_stage",
-        create_sql_stmt=demo_dim_table_create,
+        "port_dim",
+        create_sql_stmt=port_dim_table_create,
         s3_bucket=bucket_name,
         s3_key=processed_tables_key + "/port-dict",
         region='us-west-2',
@@ -280,8 +304,9 @@ load_port_to_redshift = SubDagOperator(
         start_date=default_args.get("start_date")
 
     ),
-    task_id=load_stage_port_task_id,
-    dag=dag
+    task_id=load_dim_port_task_id,
+    dag=dag,
+    provide_context=True
 )
 
 load_dim_visa_task_id = 'load_dim_visa_subdag'
@@ -301,7 +326,8 @@ load_visa_to_redshift = SubDagOperator(
 
     ),
     task_id=load_dim_visa_task_id,
-    dag=dag
+    dag=dag,
+    provide_context=True
 )
 
 load_dim_mode_task_id = 'load_dim_mode_subdag'
@@ -312,7 +338,7 @@ load_mode_to_redshift = SubDagOperator(
         "redshift",
         "aws_default",
         "mode_dim",
-        create_sql_stmt=demo_dim_table_create,
+        create_sql_stmt=mode_dim_table_create,
         s3_bucket=bucket_name,
         s3_key=processed_tables_key + "/mode",
         region='us-west-2',
@@ -321,7 +347,8 @@ load_mode_to_redshift = SubDagOperator(
 
     ),
     task_id=load_dim_mode_task_id,
-    dag=dag
+    dag=dag,
+    provide_context=True
 )
 
 load_person_dim_table = FillTablesOperator(
@@ -330,7 +357,10 @@ load_person_dim_table = FillTablesOperator(
     table="person_dim",
     redshift_conn_id="redshift",
     create_table=person_dim_table_create,
-    insert_table=person_dim_table_insert
+    insert_table=person_dim_table_insert,
+    dag_start_date=default_args.get("start_date"),
+    provide_context=True,
+
 )
 
 load_time_dim_table = FillTablesOperator(
@@ -339,7 +369,10 @@ load_time_dim_table = FillTablesOperator(
     table="time_dim",
     redshift_conn_id="redshift",
     create_table=time_dim_table_create,
-    insert_table=time_dim_table_insert
+    insert_table=time_dim_table_insert,
+    dag_start_date=default_args.get("start_date"),
+    provide_context=True,
+
 )
 
 load_imm_fact_table = FillTablesOperator(
@@ -348,11 +381,14 @@ load_imm_fact_table = FillTablesOperator(
     table="imm_fact",
     redshift_conn_id="redshift",
     create_table=imm_fact_table_create,
-    insert_table=imm_fact_table_insert
+    insert_table=imm_fact_table_insert,
+    dag_start_date=default_args.get("start_date"),
+    provide_context=True,
+
 )
 
 query_checks=[
-    	{'check_sql': "SELECT COUNT(*) FROM imm_fact WHERE  imm_fact_id", 'expected_result':0},
+    	{'check_sql': "SELECT COUNT(*) FROM imm_fact WHERE  imm_fact_id is null", 'expected_result':0},
     	{'check_sql': "SELECT COUNT(*) FROM time_dim WHERE time_id is null", 'expected_result':0},
     	{'check_sql': "SELECT COUNT(*) FROM person_dim WHERE person_id is null", 'expected_result':0},
     	{'check_sql': "SELECT COUNT(*) FROM demo_dim WHERE state_code is null", 'expected_result':0},
@@ -371,10 +407,12 @@ end_data_pipeline = DummyOperator(task_id='Stop_execution', dag=dag)
 start_data_pipeline >> create_emr_cluster >> step_one >> step_checker
 step_checker >> terminate_emr_cluster
 terminate_emr_cluster >> load_immigration_to_redshift >> load_demo_to_redshift
+# start_data_pipeline >> run_quality_checks >> end_data_pipeline
+# start_data_pipeline >> load_immigration_to_redshift >> load_demo_to_redshift
 load_demo_to_redshift >> load_country_to_redshift >> load_port_to_redshift
 load_port_to_redshift >> load_visa_to_redshift >> load_mode_to_redshift
 load_mode_to_redshift >> load_person_dim_table >> load_time_dim_table
-load_time_dim_table >> load_imm_fact_table >> end_data_pipeline
+load_time_dim_table >> load_imm_fact_table >> run_quality_checks >> end_data_pipeline
 
 
 

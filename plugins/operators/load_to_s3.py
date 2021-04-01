@@ -10,7 +10,20 @@ import pathlib
 # the data from locally to S3.
 # """
 class LoadToS3Operator(BaseOperator):
-
+    #     '''
+    #     Constructor
+    #     Parameters:
+    #         aws_conn_id (string): the name of AWS IAM connection
+    #         bucket_name (string): s3 bucket name
+    #         key (string): s3 key (dir)
+    #         relative_local_path (string): the path on local docker machine
+    #                                       to the data source
+    #         region_name (string): the location of the s3 and redshift cluster
+    #         filename (string): filename which have the default value None and
+    #                            can be completed if we want to upload
+    #                            a specific file. The defaut is to upload a dir
+    #         specific_file (boolean):  flag to specify a filename or not
+    #     '''
     @apply_defaults
     def __init__(self,
                  aws_conn_id="",
@@ -48,11 +61,6 @@ class LoadToS3Operator(BaseOperator):
             #condition which apply to upload more files in a directory
             files = [self.relative_local_path + f
                      for f in os.listdir(self.relative_local_path)]
-            #self.log.info(files)
-            # files_array = []
-            # for subdir, dirs, files in os.walk(self.relative_local_path):
-            #     for file in files:
-            #         files_array.append(os.path.join(subdir, file))
             for f in files:
                 filename = f.split('/')[-1]
                 s3.load_file(filename=f, bucket_name=self.bucket_name,

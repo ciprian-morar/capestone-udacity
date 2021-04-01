@@ -3,20 +3,23 @@ import pyspark.sql.functions as F
 import logging
 from pyspark.sql import SparkSession
 import argparse
+from common import create_spark_session
 
 first_check = ["state", "country", "port-dict", "mode", "visa", "demographics"]
 second_check = ["immigration"]
 check_array=None
 
+# get arguments passed in spark-submit command
 parser = argparse.ArgumentParser()
-
 parser.add_argument("--checkTables", help="select the array of tables to check")
 parser.add_argument("--bucketName", help="the name of the bucket")
 parser.add_argument("--processedTablesKey", help="The name of processed tables")
+#initialize variables which store passed arguments
 args = parser.parse_args()
 bucket_name=None
 check_tables=None
 processed_tables_key=None
+#assign values stored in arguments
 if args.bucketName:
     bucket_name = args.bucketName
 if args.checkTables:
@@ -26,20 +29,22 @@ if args.processedTablesKey:
 
 if check_tables == "first_check":
     check_array = first_check
-elif check_tables== "second_check":
+elif check_tables=="second_check":
     check_array = second_check
 
+# s3 bucket path
 bucket = "s3a://" + bucket_name + "/"
 
-
-def create_spark_session():
-    spark = SparkSession.builder.appName("Data quality check").getOrCreate()
-    return spark
-
+'''This function process the state file 
+    Parameters:
+            spark (object): spark sesstion object
+            input_data (string): path to the file on S3 bucket
+            table (string): the name of the 
+                            directory from S3 to check
+    Returns
+            None
+'''
 def check_func(spark, input_data, table):
-    logger = logging.getLogger()
-    spark.sparkContext.setLogLevel("ERROR")
-    logger.error(input_data)
     check_quality = spark.read.parquet(input_data)
     if check_quality.count() == 0 or check_quality.count() is None:
         raise Exception('Loading ' + table + ' dimension data failed')
