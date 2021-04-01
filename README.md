@@ -2,7 +2,7 @@
 
 
 This project is an example of building data pipelines for a data lake which we host on S3. 
-We transform the raw data using Pyspark on Aws EMR and write parquet files to S3
+We transform the raw data using Pyspark on Aws EMR and write parquet files to S3.
 From S3 where we writed the staging tables we load the data to redshift in the dimensionial and fact tables to create a Star Schema.
 Using this Star Schema we can continue finding insights and understand who are the immigrants who arrived in US States in the year 2016.
 
